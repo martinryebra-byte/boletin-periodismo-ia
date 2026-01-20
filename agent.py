@@ -1,126 +1,91 @@
-import feedparser
-import sqlite3
 import os
-import smtplib
-from email.mime.text import MIMEText
+import feedparser
 from newspaper import Article
 from openai import OpenAI
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
+import smtplib
+from email.mime.text import MIMEText
 
-from sources import RSS_FEEDS
-from prompts import CLASSIFICATION_PROMPT, SUMMARY_PROMPT
+# ==============================
+# 1️⃣ Configuración de la API Key
+# ==============================
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise ValueError("OPENAI_API_KEY no está definida. Configura el secreto en GitHub.")
+client = OpenAI(api_key=api_key)
 
-load_dotenv()
-client = OpenAI()
+# ==============================
+# 2️⃣ Configuración del correo
+# ==============================
+SMTP_HOST = "smtp.tu-servidor.com"  # Cambia por tu servidor SMTP
+SMTP_PORT = 587
+SMTP_USER = "myebra@lanacion.com.ar"
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")  # Puedes guardar la contraseña como secreto en GitHub
 
-DB = "db.sqlite"
-RECIPIENT = "myebra@lanacion.com.ar"
+TO_EMAIL = "myebra@lanacion.com.ar"
 
-# ------------------ DB ------------------
+# ==============================
+# 3️⃣ Lista de fuentes
+# ==============================
+sources = [
+    "https://www.nytimes.com/rss",
+    "https://feeds.a.dj.com/rss/RSSWorldNews.xml",
+    "https://elpais.com/rss/feed.html",
+    "https://www.lanacion.com.ar/rss",
+    "https://www.lemonde.fr/rss/",
+    # Puedes agregar más
+]
 
-def init_db():
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS articles (
-            url TEXT PRIMARY KEY,
-            date TEXT
-        )
-    """)
-    conn.commit()
-    conn.close()
+# ==============================
+# 4️⃣ Funciones
+# ==============================
+def fetch_articles():
+    articles = []
+    for feed_url in sources:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries[:3]:  # Solo los 3 primeros artículos por fuente
+            articles.append(entry.link)
+    return articles
 
-def seen(url):
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("SELECT 1 FROM articles WHERE url = ?", (url,))
-    result = c.fetchone()
-    conn.close()
-    return result is not None
-
-def mark_seen(url):
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute("INSERT OR IGNORE INTO articles VALUES (?, ?)", 
-              (url, datetime.utcnow().isoformat()))
-    conn.commit()
-    conn.close()
-
-# ------------------ IA ------------------
-
-def ask_llm(prompt, text):
+def summarize_article(url):
+    article = Article(url)
+    article.download()
+    article.parse()
+    text = article.text
+    # Llamada a OpenAI para resumir en español
     response = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": text[:12000]}
-        ],
-        temperature=0
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": f"Resume en español: {text}"}],
+        temperature=0.3,
     )
-    return response.choices[0].message.content
+    summary = response.choices[0].message.content
+    return summary
 
-# ------------------ EMAIL ------------------
+def send_email(subject, body):
+    msg = MIMEText(body, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = SMTP_USER
+    msg["To"] = TO_EMAIL
 
-def send_email(html):
-    msg = MIMEText(html, "html")
-    msg["Subject"] = f"🗞️ Periodismo e IA – {datetime.now().strftime('%d/%m/%Y')}"
-    msg["From"] = os.environ["SMTP_USER"]
-    msg["To"] = RECIPIENT
-
-    with smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"])) as server:
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
         server.starttls()
-        server.login(os.environ["SMTP_USER"], os.environ["SMTP_PASSWORD"])
+        server.login(SMTP_USER, SMTP_PASSWORD)
         server.send_message(msg)
 
-# ------------------ MAIN ------------------
+# ==============================
+# 5️⃣ Generar boletín
+# ==============================
+def main():
+    articles = fetch_articles()
+    boletin = ""
+    for url in articles:
+        try:
+            summary = summarize_article(url)
+            boletin += f"{url}\n{summary}\n\n"
+        except Exception as e:
+            boletin += f"{url}\nERROR: {e}\n\n"
 
-def run():
-    init_db()
-    confirmed = []
-
-    for feed_url in RSS_FEEDS:
-        feed = feedparser.parse(feed_url)
-        for entry in feed.entries:
-            url = entry.link
-            if seen(url):
-                continue
-
-            try:
-                art = Article(url)
-                art.download()
-                art.parse()
-                text = art.text
-            except:
-                continue
-
-            classification = ask_llm(CLASSIFICATION_PROMPT, text)
-
-            if '"CONFIRMADO"' in classification:
-                summary = ask_llm(SUMMARY_PROMPT, text)
-                confirmed.append({
-                    "title": art.title,
-                    "source": feed.feed.get("title", ""),
-                    "summary": summary,
-                    "url": url
-                })
-
-            mark_seen(url)
-
-    if not confirmed:
-        return
-
-    html = ""
-    for a in confirmed[:10]:
-        html += f"""
-        <h3>📰 {a['source']}</h3>
-        <b>{a['title']}</b>
-        <p>{a['summary']}</p>
-        <a href="{a['url']}">Leer artículo</a>
-        <hr>
-        """
-
-    send_email(html)
+    send_email("Boletín diario de artículos IA", boletin)
+    print("Boletín enviado correctamente.")
 
 if __name__ == "__main__":
-    run()
+    main()
