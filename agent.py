@@ -8,14 +8,38 @@ from email.mime.text import MIMEText
 # ==============================
 # CONFIGURACIÓN
 # ==============================
-TEST_MODE = False  # True = modo prueba, no usa OpenAI
-MAX_ARTICLES = 5   # Número máximo de artículos por medio
+TEST_MODE = False          # True = modo prueba, no usa OpenAI
+MAX_ARTICLES = 5           # Número máximo de artículos por medio
 
-# Lista de medios a monitorear
+# Lista de medios influyentes y alternativos con RSS
 MEDIOS = {
+    # Medios en español
     "El País": "https://elpais.com/rss/",
-    "NYT": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
     "La Nación": "https://www.lanacion.com.ar/rss/nota.xml",
+    "El Mundo": "https://www.elmundo.es/rss/espana.xml",
+
+    # Medios en inglés
+    "New York Times": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+    "Wall Street Journal": "https://www.wsj.com/xml/rss/3_7014.xml",
+    "Financial Times": "https://www.ft.com/?format=rss",
+    "The Guardian": "https://www.theguardian.com/world/rss",
+    "The Times of London": "https://www.thetimes.co.uk/rss",
+
+    # Medios en francés
+    "Le Monde": "https://www.lemonde.fr/rss/une.xml",
+
+    # Medios alternativos / digitales
+    "Axios": "https://www.axios.com/feed",
+    "Vox": "https://www.vox.com/rss/index.xml",
+    "The Verge": "https://www.theverge.com/rss/index.xml",
+    "Politico": "https://www.politico.com/rss/politicopicks.xml",
+    "BuzzFeed News": "https://www.buzzfeed.com/world.xml",
+
+    # Medios escandinavos innovadores
+    "Dagens Nyheter (Suecia)": "https://www.dn.se/m/rss/",
+    "Aftenposten (Noruega)": "https://www.aftenposten.no/rss",
+    "Politiken (Dinamarca)": "https://politiken.dk/rss/nyheder",
+    "Berlingske (Dinamarca)": "https://www.berlingske.dk/rss",
 }
 
 # Datos para correo
@@ -83,29 +107,4 @@ boletin = []
 
 # Configurar OpenAI
 if not TEST_MODE:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("No hay API Key definida. Cambiando a TEST_MODE para no usar OpenAI.")
-        TEST_MODE = True
-    else:
-        client = OpenAI(api_key=api_key)
-
-# Recorrer medios
-for medio, rss_url in MEDIOS.items():
-    urls = obtener_urls_rss(rss_url, MAX_ARTICLES)
-    for url in urls:
-        art = descargar_articulo(url)
-        if TEST_MODE:
-            resumen = f"(Modo prueba) {medio} - {art['title']}\nExtracto: {art['text']}"
-        else:
-            resumen = resumir_articulo(client, art["text"])
-        boletin.append(f"{medio} - {art['title']}\n{resumen}\n{art['url']}\n{'-'*50}")
-
-# Generar boletín final
-boletin_texto = "\n\n".join(boletin)
-print("=== Boletín diario ===")
-print(boletin_texto)
-
-# Enviar correo si están configurados SMTP_USER y SMTP_PASS
-if SMTP_USER and SMTP_PASS:
-    enviar_correo("Boletín diario de noticias IA", boletin_texto)
+    api_k_
