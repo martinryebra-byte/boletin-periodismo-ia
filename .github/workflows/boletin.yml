@@ -1,15 +1,14 @@
-name: Boletín Periodismo IA
+name: Prueba OpenAI API Key
 
-# Configuración para ejecución manual
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # ejecución manual
 
 jobs:
-  run-agent:
+  test-openai-key:
     runs-on: ubuntu-latest
     steps:
 
-      # 1️⃣ Clonar el repositorio
+      # 1️⃣ Clonar repositorio
       - uses: actions/checkout@v3
 
       # 2️⃣ Configurar Python
@@ -18,13 +17,13 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 3️⃣ Instalar dependencias necesarias
-      - name: Install dependencies
+      # 3️⃣ Instalar librería OpenAI
+      - name: Install OpenAI
         run: |
-          pip install openai feedparser newspaper3k python-dotenv requests lxml[html_clean]
+          pip install openai
 
-      # 4️⃣ Ejecutar el agente
-     - name: Run agent
-  env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  run: python agent.py
+      # 4️⃣ Ejecutar script de prueba
+      - name: Test OpenAI API Key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python test_openai.py
