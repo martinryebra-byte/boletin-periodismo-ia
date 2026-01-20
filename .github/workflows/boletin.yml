@@ -24,5 +24,7 @@ jobs:
           pip install openai feedparser newspaper3k python-dotenv requests lxml[html_clean]
 
       # 4️⃣ Ejecutar el agente
-      - name: Run agent
-        run: python agent.py
+     - name: Run agent
+  env:
+    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  run: python agent.py
