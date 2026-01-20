@@ -17,6 +17,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install newspaper3k
+          pip install "lxml[html_clean]"
 
       - name: Run agent (prueba)
         run: python agent.py
